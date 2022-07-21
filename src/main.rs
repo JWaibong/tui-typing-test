@@ -21,6 +21,9 @@ use tui::{
     },
     Terminal,
 };
+use std::collections::VecDeque;
+use rand_word::new;
+use itertools::Itertools;
 
 #[derive(Error, Debug)]
 pub enum Error {
@@ -90,9 +93,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut countdown : usize  = 3;
     let mut active_menu_item = MenuItem::Home;
     let mut game_start_time: Option<Instant> = None;
-
-    let game_words = vec!["the", "lazy", "dog", "jumped", "over", "the", "quick", "brown", "fox"];
-
+    let word = rand_word::new(100);
+    let mut game_words: VecDeque<&str> = word.split(' ').collect();
     loop {
         terminal.draw(|rect| {
             let size = rect.size();
@@ -141,6 +143,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                 },
                 MenuItem::Game => {
+                    let curr_problem = game_words.front().unwrap().to_owned();
+                    if curr_input.eq(curr_problem) {
+                        game_words.pop_front();
+                        curr_input.clear();
+                    }
                     let text = Spans::from(vec![Span::raw(curr_input.as_str())]);
                     let input = Paragraph::new(text).block(Block::default().title("Input").borders(Borders::ALL));
 
@@ -152,6 +159,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     if percent < 0 {
                         percent = 0;
                     }
+                    let words: Vec<Span> = game_words.iter().cloned().map(|w| {
+                        let mut w2: String = String::from(w);
+                        w2.push(' ');
+                        Span::raw(w2)
+                    }).collect();
+
+                    let lines: Vec<Spans> = words
+                    .into_iter()
+                    .chunks(10)
+                    .into_iter()
+                    .map(|chunk| {
+                        let v: Vec<Span> = chunk.collect();
+                        Spans::from(v)
+                    })
+                    .collect();
+
+
+                    rect.render_widget(Paragraph::new(lines), chunks[1]);
 
                     let progress_bar = Gauge::default()
                         .block(Block::default()

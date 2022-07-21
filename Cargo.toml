@@ -13,3 +13,5 @@ chrono = { version = "0.4", features = ["serde"] }
 rand = { version = "0.7.3", default-features = false, features = ["std"] }
 tui = { version = "0.14", default-features = false, features = ['crossterm', 'serde'] }
 thiserror = "1.0"
+rand_word = "0.1.17"
+itertools = "0.10.3"
