@@ -1,6 +1,6 @@
 use chrono::prelude::*;
 use crossterm::{
-    event::{self, Event as CEvent, KeyCode},
+    event::{self, Event as CEvent, KeyCode, KeyModifiers, KeyEvent},
     terminal::{disable_raw_mode, enable_raw_mode},
 };
 use rand::{distributions::Alphanumeric, prelude::*};
@@ -93,8 +93,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut countdown : usize  = 3;
     let mut active_menu_item = MenuItem::Home;
     let mut game_start_time: Option<Instant> = None;
-    let word = rand_word::new(100);
-    let mut game_words: VecDeque<&str> = word.split(' ').collect();
+    let word = new(100);
+    let mut game_words: VecDeque<String> = word.split(' ').map(|w| String::from(w)).collect();
     loop {
         terminal.draw(|rect| {
             let size = rect.size();
@@ -143,9 +143,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                 },
                 MenuItem::Game => {
-                    let curr_problem = game_words.front().unwrap().to_owned();
-                    if curr_input.eq(curr_problem) {
+                    let curr_problem = game_words.front().unwrap().as_str();
+                    if curr_input.trim().eq(curr_problem) {
                         game_words.pop_front();
+                        let replacement = new(1);
+                        game_words.push_back(replacement);
+
                         curr_input.clear();
                     }
                     let text = Spans::from(vec![Span::raw(curr_input.as_str())]);
@@ -197,12 +200,22 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         if start {
             match rx.recv()? {
-                Event::Input(event) => match event.code {
-                    KeyCode::Backspace => {
-                        curr_input.pop();
+                Event::Input(event) => match event.modifiers {
+                    KeyModifiers::NONE => {
+                        match event.code {
+                            KeyCode::Backspace => {
+                                curr_input.pop();
+                            }
+                            KeyCode::Char(c) => {
+                                curr_input.push(c);
+                            }
+                            _ => {}
+                        }
                     },
-                    KeyCode::Char(c) => {
-                        curr_input.push(c);
+                    KeyModifiers::CONTROL => {
+                        if event.code == KeyCode::Char('a') {
+                            curr_input.clear();
+                        }
                     },
                     _ => {}
                 },
