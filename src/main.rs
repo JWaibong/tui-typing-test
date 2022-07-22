@@ -1,11 +1,10 @@
-use chrono::prelude::*;
+
 use crossterm::{
-    event::{self, Event as CEvent, KeyCode, KeyModifiers, KeyEvent},
+    event::{self, Event as CEvent, KeyCode, KeyModifiers},
     terminal::{disable_raw_mode, enable_raw_mode},
 };
-use rand::{distributions::Alphanumeric, prelude::*};
-use serde::{Deserialize, Serialize};
-use std::fs;
+
+
 use std::io;
 use std::sync::mpsc;
 use std::thread;
@@ -95,6 +94,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut game_start_time: Option<Instant> = None;
     let word = new(100);
     let mut game_words: VecDeque<String> = word.split(' ').map(|w| String::from(w)).collect();
+
+    let mut score: usize = 0; 
+
     loop {
         terminal.draw(|rect| {
             let size = rect.size();
@@ -150,6 +152,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         game_words.push_back(replacement);
 
                         curr_input.clear();
+                        score += 1;
                     }
                     let text = Spans::from(vec![Span::raw(curr_input.as_str())]);
                     let input = Paragraph::new(text).block(Block::default().title("Input").borders(Borders::ALL));
@@ -159,11 +162,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     let in_game_timer = game_start_time.unwrap().elapsed().as_secs();
 
                     let mut percent = 100 - ((100.0 * in_game_timer as f32) / 60.0) as i32;
-                    if percent < 0 {
+                    if percent <= 0 {
                         percent = 0;
+                        active_menu_item = MenuItem::GameOver;
+                        start = false;
                     }
-                    let words: Vec<Span> = game_words.iter().cloned().map(|w| {
-                        let mut w2: String = String::from(w);
+                    let words: Vec<Span> = game_words.iter().map(|w| {
+                        let mut w2 = w.to_owned();
                         w2.push(' ');
                         Span::raw(w2)
                     }).collect();
@@ -180,19 +185,37 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 
                     rect.render_widget(Paragraph::new(lines), chunks[1]);
+                    let mut time_remaining_text = String::from("Time Remaining: ");
+                    let time_remaining_val = (60 - in_game_timer).to_string();
+                    time_remaining_text.push_str(time_remaining_val.as_str());
 
                     let progress_bar = Gauge::default()
                         .block(Block::default()
                         .borders(Borders::ALL)
-                        .title("Time Remaining"))
+                        .title(time_remaining_text))
                         .gauge_style(Style::default().fg(Color::White).bg(Color::Black))
                         .percent(percent as u16);
                     
                     rect.render_widget(progress_bar, chunks[2]);
-
+                    
                     
                 },
                 MenuItem::GameOver => {
+
+                    if start {
+                        active_menu_item = MenuItem::Home;
+                        game_words.clear();
+                        let mut new_game = new(100).split(' ').map(|w| String::from(w)).collect::<VecDeque<String>> ();
+                        game_words.append(&mut new_game);
+                    }
+                    let wpm_string : String = score.to_string();
+
+                    let game_over_text = Spans::from(vec![Span::raw("Game Over | Press 'r' to restart race | Score: "), Span::raw(wpm_string.as_str())]);
+                    let game_over_paragraph = Paragraph::new(game_over_text).block(Block::default().borders(Borders::ALL));
+                    rect.render_widget(game_over_paragraph, chunks[0]);
+
+
+
 
                 }
             };
@@ -230,7 +253,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                         terminal.show_cursor()?;
                         break;
                     }
-                    KeyCode::Char('s') => start = true,
+                    KeyCode::Char('s') | KeyCode::Char('r') => {
+                        start = true;
+                        countdown = 3;
+                        score = 0;
+                    }
                     _ => {}
                 },
                 Event::Tick => {}
